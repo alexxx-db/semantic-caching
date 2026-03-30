@@ -5,8 +5,6 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_community.chat_models import ChatDatabricks
 from operator import itemgetter
-from datetime import datetime
-from uuid import uuid4
 import os
 import mlflow
 from cache import Cache
@@ -93,10 +91,10 @@ def extract_user_query_string(chat_messages_array):
 # instead of relying on empty-string comparison.
 def router(qa):
     if qa.get("cache_hit"):
-        mlflow.log_metric("cache_hit", 1)
+        logging.info("cache_hit=True")
         return qa["answer"]
     else:
-        mlflow.log_metric("cache_hit", 0)
+        logging.info("cache_hit=False")
         return rag_chain
 
 # RAG chain

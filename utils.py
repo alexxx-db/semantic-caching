@@ -165,7 +165,7 @@ def deploy_model_serving_endpoint(
     try:
         r = client.get_endpoint(endpoint_name)
         endpoint = client.update_endpoint(
-            endpoint="chat",
+            endpoint=endpoint_name,
             config=_config,
             )
     except Exception:

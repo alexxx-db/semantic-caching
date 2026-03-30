@@ -114,20 +114,22 @@ class Cache:
 
         results = vs_index_cache.similarity_search(
             query_vector=self.get_embedding(question),
-            columns=["id", "question", "answer", "creator", "access_level"],
+            columns=["id", "question", "answer", "creator", "access_level",
+                     "created_at", "last_accessed", "text_vector"],
             num_results=3  # fetch a few candidates for filtering
         )
 
         if not results or results['result']['row_count'] == 0:
             return qa
 
+        # Columns: id(0), question(1), answer(2), creator(3), access_level(4),
+        #          created_at(5), last_accessed(6), text_vector(7), score(8)
         for row in results['result']['data_array']:
             record_id = row[0]
-            cached_question = row[1]
             cached_answer = row[2]
             cached_creator = row[3]
             cached_access_level = row[4]
-            score = row[5]  # score is appended as the last column
+            score = row[8]  # score is appended as the last column
 
             try:
                 if float(score) < self.config.SIMILARITY_THRESHOLD:
@@ -140,11 +142,12 @@ class Cache:
                 if creator is not None and cached_creator != creator:
                     continue  # creator mismatch
 
-                # Cache hit — update last_accessed timestamp
+                # Cache hit — update last_accessed with full document to avoid
+                # partial upsert corrupting the entry
                 qa["answer"] = cached_answer
                 qa["cache_hit"] = True
                 logging.info(f"Cache hit: score={score}")
-                self._touch_entry(record_id)
+                self._touch_entry(row)
                 return qa
 
             except (ValueError, TypeError):
@@ -154,20 +157,35 @@ class Cache:
         logging.info("Cache hit: False (no candidates passed threshold/filters)")
         return qa
 
-    def _touch_entry(self, record_id):
-        """Update last_accessed timestamp on a cache entry (best-effort)."""
+    def _touch_entry(self, row):
+        """Update last_accessed timestamp on a cache entry using a full upsert.
+
+        Args:
+            row: The full data_array row from similarity_search results.
+                 Columns: id(0), question(1), answer(2), creator(3),
+                 access_level(4), created_at(5), last_accessed(6), text_vector(7)
+        """
         try:
             vs_index_cache = self._get_index()
             vs_index_cache.upsert([{
-                "id": record_id,
-                "last_accessed": datetime.now().isoformat()
+                "id": row[0],
+                "question": row[1],
+                "answer": row[2],
+                "creator": row[3],
+                "access_level": row[4],
+                "created_at": row[5],
+                "last_accessed": datetime.now().isoformat(),
+                "text_vector": row[7],
             }])
         except Exception as e:
             # Non-critical — don't fail the request if timestamp update fails
-            logging.debug(f"Failed to update last_accessed for {record_id}: {e}")
+            logging.debug(f"Failed to update last_accessed for {row[0]}: {e}")
 
     def store_in_cache(self, question, answer, creator="user", access_level=0):
         """Store a response in the cache if it meets minimum quality criteria."""
+        if not answer:
+            logging.info("Empty or None answer, skipping cache store")
+            return
         min_len = getattr(self.config, 'MIN_RESPONSE_LENGTH', 0)
         if min_len and len(answer.strip()) < min_len:
             logging.info(f"Response too short ({len(answer.strip())} chars), skipping cache store")
@@ -218,8 +236,9 @@ class Cache:
         index = self._get_index()
 
         while docs_to_remove > 0:
-            # Fetch more candidates than needed so we can sort and pick the oldest
-            fetch_size = min(docs_to_remove * 2, max(batch_size, docs_to_remove))
+            # Fetch more candidates than needed so we can sort and pick the oldest.
+            # Cap at 1000 — Vector Search maximum num_results per query.
+            fetch_size = min(docs_to_remove * 2, max(batch_size, docs_to_remove), 1000)
             results = index.similarity_search(
                 query_vector=[0] * self.config.EMBEDDING_DIMENSION,
                 columns=["id", sort_field],
