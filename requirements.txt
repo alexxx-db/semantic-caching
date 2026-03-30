@@ -1,4 +1,4 @@
 databricks-agents==0.7.0
 databricks-vectorsearch==0.41
-langchain~=0.3.0
-langchain-community~=0.3.27
+langchain==0.3.0
+langchain-community==0.3.27

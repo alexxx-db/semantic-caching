@@ -149,7 +149,7 @@ def deploy_model_serving_endpoint(
             "model_version": get_latest_model_version(model_full_name),
             "workload_type": "CPU",
             "workload_size": "Small",
-            "scale_to_zero_enabled": "true",
+            "scale_to_zero_enabled": "false",
             "environment_vars": {
                     "DATABRICKS_HOST": host,
                     "DATABRICKS_TOKEN": token,
@@ -168,7 +168,7 @@ def deploy_model_serving_endpoint(
             endpoint="chat",
             config=_config,
             )
-    except:
+    except Exception:
         # Make sure to the schema for the inference table exists
         _ = spark.sql(f"CREATE SCHEMA IF NOT EXISTS {catalog}.{logging_schema}")
         # Make sure to drop the inference table it exists

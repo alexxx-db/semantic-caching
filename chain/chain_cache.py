@@ -74,12 +74,13 @@ model = ChatDatabricks(
     extra_params={"temperature": 0.01, "max_tokens": 500}
 )
 
-# Call the foundation model
+# Call the foundation model and store result in cache (with quality gate)
 def call_model(prompt):
     response = model.invoke(prompt)
+    question = prompt.dict()['messages'][1]['content']
     semantic_cache.store_in_cache(
-        question = prompt.dict()['messages'][1]['content'], 
-        answer = response.content
+        question=question,
+        answer=response.content
     )
     return response
 
@@ -87,12 +88,16 @@ def call_model(prompt):
 def extract_user_query_string(chat_messages_array):
     return chat_messages_array[-1]["content"]
 
-# Router to determine which subsequent step to be executed
+# Router to determine which subsequent step to be executed.
+# Uses the 'cache_hit' flag set by Cache.get_from_cache() for a robust check
+# instead of relying on empty-string comparison.
 def router(qa):
-    if qa["answer"] == "":
-        return rag_chain
+    if qa.get("cache_hit"):
+        mlflow.log_metric("cache_hit", 1)
+        return qa["answer"]
     else:
-        return (qa["answer"])
+        mlflow.log_metric("cache_hit", 0)
+        return rag_chain
 
 # RAG chain
 rag_chain = (
