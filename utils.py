@@ -97,7 +97,7 @@ def wait_for_index_to_be_ready(vsc, vs_endpoint_name, vs_index_fullname):
       time.sleep(10)
     else:
         raise Exception(f'''Error with the index - this shouldn't happen. DLT pipeline might have been killed.\n Please delete it and re-run the previous cell: vsc.delete_index("{vs_index_fullname}, {vs_endpoint_name}") \nIndex details: {idx}''')
-  raise Exception(f"Timeout, your index isn't ready yet: {vsc.get_index(vs_index_fullname, vs_endpoint_name)}")
+  raise Exception(f"Timeout, your index isn't ready yet: {vsc.get_index(vs_endpoint_name, vs_index_fullname)}")
 
 
 def create_or_update_direct_index(vsc, vs_endpoint_name, vs_index_fullname, vector_search_index_schema, vector_search_index_config):

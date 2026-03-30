@@ -114,22 +114,20 @@ class Cache:
 
         results = vs_index_cache.similarity_search(
             query_vector=self.get_embedding(question),
-            columns=["id", "question", "answer", "creator", "access_level",
-                     "created_at", "last_accessed", "text_vector"],
+            columns=["id", "question", "answer", "creator", "access_level"],
             num_results=3  # fetch a few candidates for filtering
         )
 
         if not results or results['result']['row_count'] == 0:
             return qa
 
-        # Columns: id(0), question(1), answer(2), creator(3), access_level(4),
-        #          created_at(5), last_accessed(6), text_vector(7), score(8)
+        # Columns: id(0), question(1), answer(2), creator(3), access_level(4), score(5)
         for row in results['result']['data_array']:
             record_id = row[0]
             cached_answer = row[2]
             cached_creator = row[3]
             cached_access_level = row[4]
-            score = row[8]  # score is appended as the last column
+            score = row[5]  # score is appended as the last column by VS
 
             try:
                 if float(score) < self.config.SIMILARITY_THRESHOLD:
@@ -142,12 +140,11 @@ class Cache:
                 if creator is not None and cached_creator != creator:
                     continue  # creator mismatch
 
-                # Cache hit — update last_accessed with full document to avoid
-                # partial upsert corrupting the entry
+                # Cache hit — update last_accessed timestamp
                 qa["answer"] = cached_answer
                 qa["cache_hit"] = True
                 logging.info(f"Cache hit: score={score}")
-                self._touch_entry(row)
+                self._touch_entry(record_id)
                 return qa
 
             except (ValueError, TypeError):
@@ -157,29 +154,22 @@ class Cache:
         logging.info("Cache hit: False (no candidates passed threshold/filters)")
         return qa
 
-    def _touch_entry(self, row):
-        """Update last_accessed timestamp on a cache entry using a full upsert.
+    def _touch_entry(self, record_id):
+        """Update last_accessed timestamp on a cache entry.
 
-        Args:
-            row: The full data_array row from similarity_search results.
-                 Columns: id(0), question(1), answer(2), creator(3),
-                 access_level(4), created_at(5), last_accessed(6), text_vector(7)
+        Uses a partial upsert — Databricks VS direct-access indexes only update
+        the columns included in the upsert payload, leaving all other columns
+        (question, answer, text_vector, etc.) unchanged.
         """
         try:
             vs_index_cache = self._get_index()
             vs_index_cache.upsert([{
-                "id": row[0],
-                "question": row[1],
-                "answer": row[2],
-                "creator": row[3],
-                "access_level": row[4],
-                "created_at": row[5],
+                "id": record_id,
                 "last_accessed": datetime.now().isoformat(),
-                "text_vector": row[7],
             }])
         except Exception as e:
             # Non-critical — don't fail the request if timestamp update fails
-            logging.debug(f"Failed to update last_accessed for {row[0]}: {e}")
+            logging.debug(f"Failed to update last_accessed for {record_id}: {e}")
 
     def store_in_cache(self, question, answer, creator="user", access_level=0):
         """Store a response in the cache if it meets minimum quality criteria."""
