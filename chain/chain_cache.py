@@ -1,9 +1,9 @@
 from databricks.vector_search.client import VectorSearchClient
-from langchain_community.vectorstores import DatabricksVectorSearch
+from langchain_databricks import DatabricksVectorSearch
 from langchain.schema.runnable import RunnableLambda, RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_community.chat_models import ChatDatabricks
+from langchain_databricks import ChatDatabricks
 from operator import itemgetter
 from datetime import datetime
 from uuid import uuid4
@@ -32,19 +32,13 @@ vsc = VectorSearchClient(
     disable_notice=True,
 )
 
-# Get the Vector Search index
-vs_index = vsc.get_index(
-    index_name=config.VS_INDEX_FULLNAME,
-    endpoint_name=config.VECTOR_SEARCH_ENDPOINT_NAME,
-    )
-
 # Instantiate a Cache object
 semantic_cache = Cache(vsc, config)
 
 # Turn the Vector Search index into a LangChain retriever
 vector_search_as_retriever = DatabricksVectorSearch(
-    vs_index,
-    text_column="content",
+    endpoint=config.VECTOR_SEARCH_ENDPOINT_NAME,
+    index_name=config.VS_INDEX_FULLNAME,
     columns=["id", "content", "url"],
 ).as_retriever(search_kwargs={"k": 3}) # Number of search results that the retriever returns
 
@@ -75,10 +69,11 @@ model = ChatDatabricks(
 )
 
 # Call the foundation model
-def call_model(prompt):
-    response = model.invoke(prompt)
+def call_model(prompt_value):
+    response = model.invoke(prompt_value)
+    messages = prompt_value.to_messages()
     semantic_cache.store_in_cache(
-        question = prompt.dict()['messages'][1]['content'], 
+        question = messages[1].content,
         answer = response.content
     )
     return response
