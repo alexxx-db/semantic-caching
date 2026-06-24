@@ -26,6 +26,9 @@ class Config:
         self.LOGGING_SCHEMA_CACHE = f"logging"
         self.CACHE_WARMING_FILE_PATH="data/synthetic_qa.txt"
         self.INDEX_NAME = "cache_index"
+        # L2-distance-based score: 1/(1+dist²). For 1024-dim GTE-large embeddings,
+        # similar questions score ~0.005–0.02; dissimilar questions score <0.005.
+        # This is NOT cosine similarity (which would range 0.0–1.0).
         self.SIMILARITY_THRESHOLD = 0.01
 
         self.VECTOR_SEARCH_INDEX_SCHEMA_CACHE = {
@@ -35,8 +38,13 @@ class Config:
             "answer": "string",
             "access_level": "int",
             "created_at": "timestamp",
+            "last_accessed": "timestamp",
             "text_vector": "array<float>"
         }
+
+        # Minimum response length (chars) to cache. Prevents caching empty or
+        # trivially short LLM responses that are likely errors or refusals.
+        self.MIN_RESPONSE_LENGTH = 20
 
         self.EMBEDDING_DIMENSION = 1024
         self.VECTOR_SEARCH_INDEX_CONFIG_CACHE = {
