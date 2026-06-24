@@ -1,4 +1,15 @@
+<<<<<<< HEAD
+databricks-agents
+databricks-vectorsearch
+langchain-databricks
+langchain
+langchain-community
+=======
 databricks-agents==0.7.0
 databricks-vectorsearch==0.41
 langchain==0.3.0
 langchain-community==0.3.27
+<<<<<<< HEAD
+=======
+>>>>>>> 50e7429 (Improvements and bug fixes)
+>>>>>>> databricks-industry-solutions-main

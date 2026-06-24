@@ -74,7 +74,7 @@ def index_exists(vsc, vs_endpont_name, vs_index_name):
     vsc.get_index(vs_endpont_name, vs_index_name).describe()
     return True
   except Exception as e:
-    if 'RESOURCE_DOES_NOT_EXIST' not in str(e):
+    if 'RESOURCE_DOES_NOT_EXIST' not in str(e) and 'does not exist' not in str(e) and 'NotFound' not in str(type(e).__name__):
       print(f'Unexpected error describing the index. This could be a permission issue.')
       raise e
   return False
@@ -110,7 +110,7 @@ def create_or_update_direct_index(vsc, vs_endpoint_name, vs_index_fullname, vect
             **vector_search_index_config
         )
     except Exception as e:
-        if 'RESOURCE_ALREADY_EXISTS' not in str(e):
+        if 'RESOURCE_ALREADY_EXISTS' not in str(e) and 'already exists' not in str(e):
             print(f'Unexpected error...')
             raise e
     wait_for_index_to_be_ready(vsc, vs_endpoint_name, vs_index_fullname)
@@ -156,19 +156,28 @@ def deploy_model_serving_endpoint(
                     "ENABLE_MLFLOW_TRACING": "true",
                 }
             }],
-        "auto_capture_config": {
-            "catalog_name": catalog,
-            "schema_name": logging_schema,
-            "table_name_prefix": endpoint_name,
-            }
         }
+    endpoint_exists = False
     try:
-        r = client.get_endpoint(endpoint_name)
+        client.get_endpoint(endpoint_name)
+        endpoint_exists = True
+    except Exception:
+        pass
+
+    if endpoint_exists:
         endpoint = client.update_endpoint(
             endpoint=endpoint_name,
             config=_config,
             )
+<<<<<<< HEAD
     except Exception:
+=======
+<<<<<<< HEAD
+    else:
+=======
+    except Exception:
+>>>>>>> 50e7429 (Improvements and bug fixes)
+>>>>>>> databricks-industry-solutions-main
         # Make sure to the schema for the inference table exists
         _ = spark.sql(f"CREATE SCHEMA IF NOT EXISTS {catalog}.{logging_schema}")
         # Make sure to drop the inference table it exists

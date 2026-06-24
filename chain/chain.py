@@ -1,7 +1,6 @@
-from databricks.vector_search.client import VectorSearchClient
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_community.chat_models import ChatDatabricks
-from langchain_community.vectorstores import DatabricksVectorSearch
+from langchain_databricks import ChatDatabricks
+from langchain_databricks import DatabricksVectorSearch
 from langchain.schema.runnable import RunnableLambda, RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from operator import itemgetter
@@ -15,20 +14,10 @@ mlflow.langchain.autolog()
 # load parameters
 config = Config()
 
-# Connect to the Vector Search Index
-vs_index = VectorSearchClient(
-    workspace_url=os.environ['DATABRICKS_HOST'],
-    personal_access_token=os.environ['DATABRICKS_TOKEN'],
-    disable_notice=True,
-    ).get_index(
-    endpoint_name=config.VECTOR_SEARCH_ENDPOINT_NAME,
-    index_name=config.VS_INDEX_FULLNAME,
-)
-
 # Turn the Vector Search index into a LangChain retriever
 vector_search_as_retriever = DatabricksVectorSearch(
-    vs_index,
-    text_column="content",
+    endpoint=config.VECTOR_SEARCH_ENDPOINT_NAME,
+    index_name=config.VS_INDEX_FULLNAME,
     columns=["id", "content", "url"],
 ).as_retriever(search_kwargs={"k": 3}) # Number of search results that the retriever returns
 # Enable the RAG Studio Review App and MLFlow to properly display track and display retrieved chunks for evaluation
